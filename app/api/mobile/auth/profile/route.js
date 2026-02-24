@@ -1,0 +1,47 @@
+import { NextResponse } from "next/server";
+import connectDB from "@/lib/db";
+import User from "@/models/User";
+import { getAuthUser } from "@/lib/jwt";
+// GET /api/mobile/auth/profile — get current user profile
+export async function GET(req) {
+  try {
+    const decoded = await getAuthUser(req);
+    if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
+    await connectDB();
+    const user = await User.findById(decoded.userId).select("-passwordHash").lean();
+    if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...user,
+        followerCount: user.followers?.length || 0,
+        followingCount: user.following?.length || 0,
+      },
+    });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
+}
+
+// PUT /api/mobile/auth/profile — update profile
+export async function PUT(req) {
+  try {
+    const decoded = await authenticateRequest(req);
+    if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
+    await connectDB();
+    const body = await req.json();
+    const allowed = ["displayName", "bio", "location", "website", "avatar", "coverImage", "socialLinks"];
+    const updates = {};
+    for (const key of allowed) {
+      if (body[key] !== undefined) updates[key] = body[key];
+    }
+
+    const user = await User.findByIdAndUpdate(decoded.userId, updates, { new: true }).select("-passwordHash");
+    return NextResponse.json({ success: true, data: user });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
+}
