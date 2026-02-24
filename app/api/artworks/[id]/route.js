@@ -6,10 +6,12 @@ import Artwork from "@/models/Artwork";
 
 // GET /api/artworks/[id]
 export async function GET(req, { params }) {
+  const { id } = await params;
+  console.log("FOOBAAR", id);
   try {
     await connectDB();
-    const artwork = await Artwork.findById(params.id)
-      .populate("artistId", "displayName username avatar bio location verified")
+    const artwork = await Artwork.findById(id)
+      .populate("artist", "displayName username avatar bio location verified")
       .lean();
 
     if (!artwork) {
@@ -17,7 +19,7 @@ export async function GET(req, { params }) {
     }
 
     // Increment views
-    await Artwork.findByIdAndUpdate(params.id, { $inc: { views: 1 } });
+    await Artwork.findByIdAndUpdate(id, { $inc: { views: 1 } });
 
     return NextResponse.json({ success: true, data: artwork });
   } catch (err) {
@@ -27,13 +29,16 @@ export async function GET(req, { params }) {
 
 // PUT /api/artworks/[id]
 export async function PUT(req, { params }) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     await connectDB();
-    const artwork = await Artwork.findById(params.id);
-    if (!artwork) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const artwork = await Artwork.findById(id);
+    if (!artwork)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (artwork.artistId.toString() !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -50,13 +55,16 @@ export async function PUT(req, { params }) {
 
 // DELETE /api/artworks/[id]
 export async function DELETE(req, { params }) {
+  const { id } = await params;
   try {
     const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!session)
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     await connectDB();
-    const artwork = await Artwork.findById(params.id);
-    if (!artwork) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const artwork = await Artwork.findById(id);
+    if (!artwork)
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (artwork.artistId.toString() !== session.user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

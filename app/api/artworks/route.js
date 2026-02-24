@@ -14,13 +14,13 @@ export async function GET(req) {
     const status = searchParams.get("status") || "available";
     const sort = searchParams.get("sort") || "newest";
     const search = searchParams.get("search");
-    const artistId = searchParams.get("artistId");
+    const artist = searchParams.get("artist");
     const featured = searchParams.get("featured");
 
     const filter = {};
     if (medium) filter.medium = medium;
     if (status !== "all") filter.status = status;
-    if (artistId) filter.artistId = artistId;
+    if (artist) filter.artist = artist;
     if (featured === "true") filter.featured = true;
     if (search) filter.$text = { $search: search };
 
@@ -36,7 +36,7 @@ export async function GET(req) {
       .sort(sortMap[sort] || sortMap.newest)
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("artistId", "displayName username avatar verified")
+      .populate("artist", "displayName username avatar verified")
       .lean();
 
     const total = await Artwork.countDocuments(filter);
