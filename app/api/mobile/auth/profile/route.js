@@ -50,7 +50,7 @@ export async function GET(req) {
 export async function PUT(req) {
   try {
     const decoded = await getAuthUser(req);
-    console.log(decoded);
+ 
     if (!decoded) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -73,7 +73,7 @@ export async function PUT(req) {
         updates[allowed[i]] = body[allowed[i]];
       }
     }
-    console.log(updates);
+
     
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });

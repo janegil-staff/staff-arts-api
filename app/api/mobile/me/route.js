@@ -9,12 +9,12 @@ export async function GET(req) {
   try {
     const decoded = await getAuthUser(req);
     if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-    console.log("DECODED" ,decoded);
+
     await connectDB();
-    const user = await User.findById(decoded.userId).select("-password").lean();
+    const user = await User.findById(decoded).select("-password").lean();
     if (!user) return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
 
-    const artworkCount = await Artwork.countDocuments({ artist: decoded.userId });
+    const artworkCount = await Artwork.countDocuments({ artist: decoded });
 
     return NextResponse.json({
       success: true,
