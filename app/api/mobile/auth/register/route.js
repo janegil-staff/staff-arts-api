@@ -33,7 +33,7 @@ export async function POST(req) {
 
     const user = await User.create({
       email: email.toLowerCase(),
-      passwordHash,
+      password: passwordHash,
       name,
       username,
       displayName,

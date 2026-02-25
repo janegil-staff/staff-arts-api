@@ -6,7 +6,7 @@ import { signToken, signRefreshToken } from "@/lib/jwt";
 
 // POST /api/mobile/auth/login
 export async function POST(req) {
-console.log("ENTERING")
+  console.log("ENTERING");
   try {
     await connectDB();
     const { email, password } = await req.json();
@@ -17,10 +17,12 @@ console.log("ENTERING")
         { status: 400 },
       );
     }
-
     const user = await User.findOne({ email: email.toLowerCase() }).select(
       "+password",
     );
+    console.log("USER FOUND:", !!user);
+    console.log("HAS PASSWORD:", !!user?.password);
+    console.log("PASSWORD HASH:", user?.password?.substring(0, 10));
 
     if (!user || !user.password) {
       return NextResponse.json(
@@ -28,16 +30,16 @@ console.log("ENTERING")
         { status: 401 },
       );
     }
-
     const valid = await bcrypt.compare(password, user.password);
-console.log(valid)
+    console.log("BCRYPT VALID:", valid);
+
     if (!valid) {
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },
         { status: 401 },
       );
     }
-   
+
     const payload = {
       userId: user._id.toString(),
       email: user.email,

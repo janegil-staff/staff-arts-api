@@ -56,6 +56,7 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     var userId = await getAuthUser(req);
+  
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -83,11 +84,10 @@ export async function POST(req) {
       category: body.category || "",
       year: body.year || undefined,
       status: "available",
-      pricing: {
-        forSale: body.forSale || false,
-        price: body.forSale ? (body.price || 0) : 0,
-        currency: body.currency || "USD",
-      },
+      forSale: body.forSale || false,
+      price: body.forSale ? (body.price || 0) : 0,
+      currency: body.currency || "USD",
+
     });
 
     return NextResponse.json({ success: true, data: artwork }, { status: 201 });

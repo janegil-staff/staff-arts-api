@@ -60,14 +60,8 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ role: 1, isFeatured: 1 });
 userSchema.index({ name: "text", bio: "text" });
 
-// Hash password before save
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("password") || !this.password) return;
-  this.password = await bcrypt.hash(this.password, 12);
-});
-
 // Auto-generate slug from name
-userSchema.pre("save", function (next) {
+userSchema.pre("save", function () {
   if (this.isModified("name") && !this.slug) {
     this.slug = this.name
       .toLowerCase()
