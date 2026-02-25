@@ -48,19 +48,21 @@ export async function GET(req) {
 
 // PUT /api/mobile/auth/profile — update profile
 export async function PUT(req) {
+    const body = await req.json();
+ console.log(body);
   try {
     const decoded = await getAuthUser(req);
-    console.log(decoded);
     if (!decoded) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectDB();
-    const body = await req.json();
 
+    
     const allowed = [
-      "displayName",
+      "name",
       "bio",
+      "displayName",
       "location",
       "website",
       "avatar",
@@ -73,8 +75,7 @@ export async function PUT(req) {
         updates[allowed[i]] = body[allowed[i]];
       }
     }
-    console.log(updates);
-    
+
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
@@ -82,7 +83,7 @@ export async function PUT(req) {
     const user = await User.findByIdAndUpdate(decoded, updates, { new: true })
       .select("-password")
       .lean();
-
+   console.log(user);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
@@ -109,21 +110,3 @@ export async function PUT(req) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

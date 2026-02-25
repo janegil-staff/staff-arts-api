@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Artwork from "@/models/Artwork";
 import { getAuthUser } from "@/lib/jwt";
+import "@/models/User";
 
 // GET /api/artworks — list artworks with filters
 export async function GET(req) {
@@ -36,7 +37,7 @@ export async function GET(req) {
       .sort(sortMap[sort] || sortMap.newest)
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("artist", "displayName username avatar verified")
+      .populate("artist", "name username displayName name avatar verified")
       .lean();
 
     const total = await Artwork.countDocuments(filter);

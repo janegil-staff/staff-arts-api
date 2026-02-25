@@ -11,7 +11,7 @@ export async function GET(req, { params }) {
   try {
     await connectDB();
     const artwork = await Artwork.findById(id)
-      .populate("artist", "displayName username avatar bio location verified")
+      .populate("artist", "displayName username name avatar bio location verified")
       .lean();
 
     if (!artwork) {

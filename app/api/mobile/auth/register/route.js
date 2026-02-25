@@ -8,7 +8,7 @@ import { signToken, signRefreshToken } from "@/lib/jwt";
 export async function POST(req) {
   try {
     await connectDB();
-    const { email, password, name, role } = await req.json();
+    const { email, password, name, displayName, role } = await req.json();
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -36,6 +36,7 @@ export async function POST(req) {
       passwordHash,
       name,
       username,
+      displayName,
       role: ["artist", "collector", "gallery"].includes(role)
         ? role
         : "collector",
@@ -58,6 +59,7 @@ export async function POST(req) {
             id: user._id,
             email: user.email,
             name: user.name,
+            displayName: user.displayName,
             username: user.username,
             role: user.role,
             avatar: user.avatar || "",
