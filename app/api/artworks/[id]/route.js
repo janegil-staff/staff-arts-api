@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import connectDB from "@/lib/db";
 import Artwork from "@/models/Artwork";
 import jwt from "jsonwebtoken";
+import { getAuthUser } from "@/lib/jwt";
 
 // GET /api/artworks/[id]
 export async function GET(req, { params }) {
@@ -53,32 +54,37 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
-
 export async function DELETE(req, { params }) {
   const { id } = await params;
+
   try {
     let userId;
 
-    // Try session (web)
-    const session = await getServerSession(authOptions);
-    if (session) {
-      userId = session.user.id;
-    } else {
-      // Try mobile — userId from body
-      const body = await req.json();
-      userId = body.userId;
+    // 1. Try Bearer token (mobile)
+    userId = await getAuthUser(req);
+
+    // 2. Try session (web)
+    if (!userId) {
+      const session = await getServerSession(authOptions);
+      if (session) {
+        userId = session.user.id;
+      }
     }
 
-    if (!userId)
+    if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     await connectDB();
     const artwork = await Artwork.findById(id);
-    if (!artwork)
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    if (artwork.artist.toString() !== userId)
+    if (!artwork) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    if (artwork.artist.toString() !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     await Artwork.findByIdAndDelete(id);
     return NextResponse.json({ success: true, message: "Artwork deleted" });
