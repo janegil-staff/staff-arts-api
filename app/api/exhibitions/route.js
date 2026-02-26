@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
 import Exhibition from "@/models/Exhibition";
+import User from "@/models/User";          // ← add this line
 import { getAuthUser } from "@/lib/jwt";
+import { NextResponse } from "next/server";
 
 // GET /api/exhibitions — list exhibitions
 export async function GET(req) {
@@ -22,15 +23,22 @@ export async function GET(req) {
         .sort({ startDate: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate("curatorId", "displayName username avatar")
-        .populate("artistIds", "displayName username avatar")
+        .populate("organizer", "displayName name avatar")
+        .populate("artists", "displayName name avatar")
         .lean(),
       Exhibition.countDocuments(query),
     ]);
 
-    return NextResponse.json({ success: true, data: { exhibitions, total, page, pages: Math.ceil(total / limit) } });
+    return NextResponse.json({
+      success: true,
+      data: { exhibitions, total, page, pages: Math.ceil(total / limit) },
+    });
   } catch (err) {
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.log("GET /api/exhibitions error:", err);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 },
+    );
   }
 }
 
@@ -38,13 +46,25 @@ export async function GET(req) {
 export async function POST(req) {
   try {
     const decoded = await getAuthUser(req);
-    if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    if (!decoded)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
 
     await connectDB();
     const body = await req.json();
-    const exhibition = await Exhibition.create({ ...body, curatorId: decoded.userId });
-    return NextResponse.json({ success: true, data: exhibition }, { status: 201 });
+
+    const exhibition = await Exhibition.create({ ...body, organizer: decoded });
+
+    return NextResponse.json(
+      { success: true, data: exhibition },
+      { status: 201 },
+    );
   } catch (err) {
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 },
+    );
   }
 }

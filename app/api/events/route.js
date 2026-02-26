@@ -1,53 +1,59 @@
+// app/api/events/route.js
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import connectDB from "@/lib/db";
 import Event from "@/models/Event";
-
-// GET /api/events
+import User from "@/models/User"; 
+import { getAuthUser } from "@/lib/jwt";
+import "@/models/User";
 export async function GET(req) {
   try {
     await connectDB();
     const { searchParams } = new URL(req.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "12");
-    const type = searchParams.get("type");
-    const upcoming = searchParams.get("upcoming") !== "false";
+    const limit = parseInt(searchParams.get("limit") || "20");
 
-    const filter = {};
-    if (type) filter.type = type;
-    if (upcoming) filter.startDate = { $gte: new Date() };
-
-    const events = await Event.find(filter)
-      .sort({ startDate: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate("organizerId", "displayName username avatar")
-      .lean();
-
-    const total = await Event.countDocuments(filter);
+    const [events, total] = await Promise.all([
+      Event.find({})
+        .sort({ date: -1, startDate: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .populate("organizer", "displayName name avatar")
+        .lean(),
+      Event.countDocuments({}),
+    ]);
 
     return NextResponse.json({
       success: true,
       data: { events, total, page, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.log("GET /api/events error:", err);
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
 
-// POST /api/events
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
     await connectDB();
+
+    const decoded = await getAuthUser(req);
+    if (!decoded)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+
+
     const body = await req.json();
-    const event = await Event.create({ ...body, organizerId: session.user.id });
+    console.log(body);
+    const event = await Event.create({
+      ...body,
+      organizer: decoded,  // or whatever your Event schema calls it
+    });
 
     return NextResponse.json({ success: true, data: event }, { status: 201 });
   } catch (err) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.log("POST /api/events error:", err);
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }

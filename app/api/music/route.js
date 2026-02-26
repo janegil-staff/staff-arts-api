@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
-import Music from "@/models/Music";
+import Music from "@/models/MusicTrack";
 import { getAuthUser } from "@/lib/jwt";
 
 // GET /api/music
