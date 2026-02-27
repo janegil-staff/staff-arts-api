@@ -3,7 +3,13 @@ import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema(
   {
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
     password: { type: String, select: false, minlength: 8 },
     name: { type: String, required: true, trim: true, maxlength: 100 },
     displayName: { type: String },
@@ -11,7 +17,11 @@ const userSchema = new mongoose.Schema(
     avatar: { type: String, default: null },
     coverImage: { type: String, default: null },
     bio: { type: String, maxlength: 500, default: "" },
-    role: { type: String, enum: ["artist", "gallery", "collector", "admin"], default: "collector" },
+    role: {
+      type: String,
+      enum: ["artist", "gallery", "collector", "admin"],
+      default: "collector",
+    },
 
     // Profile
     location: { type: String, default: "" },
@@ -52,8 +62,9 @@ const userSchema = new mongoose.Schema(
       emailNotifications: { type: Boolean, default: true },
       showEmail: { type: Boolean, default: false },
     },
+    pushTokens: [{ type: String }],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes
@@ -63,11 +74,13 @@ userSchema.index({ name: "text", bio: "text" });
 // Auto-generate slug from name
 userSchema.pre("save", function () {
   if (this.isModified("name") && !this.slug) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-") +
-      "-" + Math.random().toString(36).slice(2, 6);
+    this.slug =
+      this.name
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s+/g, "-") +
+      "-" +
+      Math.random().toString(36).slice(2, 6);
   }
 });
 

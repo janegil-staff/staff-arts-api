@@ -228,41 +228,6 @@ const commissionSchema = new mongoose.Schema(
 export const Commission =
   mongoose.models.Commission || mongoose.model("Commission", commissionSchema);
 
-// ─── Conversation & Message ──────────────────────────────────
-const conversationSchema = new mongoose.Schema(
-  {
-    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-    lastMessage: { type: String, default: "" },
-    lastMessageAt: { type: Date, default: Date.now },
-  },
-  { timestamps: true },
-);
-conversationSchema.index({ participants: 1, lastMessageAt: -1 });
-export const Conversation =
-  mongoose.models.Conversation ||
-  mongoose.model("Conversation", conversationSchema);
-
-const messageSchema = new mongoose.Schema(
-  {
-    conversation: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Conversation",
-      required: true,
-      index: true,
-    },
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    content: { type: String, required: true, maxlength: 5000 },
-    images: [{ url: String, publicId: String }],
-    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
-  },
-  { timestamps: true },
-);
-export const Message =
-  mongoose.models.Message || mongoose.model("Message", messageSchema);
 
 // ─── Music Track ─────────────────────────────────────────────
 const musicTrackSchema = new mongoose.Schema(
