@@ -4,9 +4,9 @@ import Artwork from "@/models/Artwork";
 import User from "@/models/User";
 import Event from "@/models/Event";
 import Exhibition from "@/models/Exhibition";
-import MusicTrack from "@/models/MusicTrack";
+import Music from "@/models/Music";
 
-// GET /api/search?q=term&type=all|artworks|users|events|exhibitions|MusicTrackTrack
+// GET /api/search?q=term&type=all|artworks|users|events|exhibitions|music
 export async function GET(req) {
   try {
     await connectDB();
@@ -60,8 +60,8 @@ export async function GET(req) {
         .lean();
     }
 
-    if (type === "all" || type === "MusicTrackTrack") {
-      results.MusicTrack = await MusicTrack.find({
+    if (type === "all" || type === "music") {
+      results.music = await Music.find({
         $or: [{ title: regex }, { genre: regex }, { tags: regex }],
       })
         .limit(limit)
