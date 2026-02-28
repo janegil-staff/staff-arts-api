@@ -20,10 +20,8 @@ export async function POST(req) {
     const user = await User.findOne({ email: email.toLowerCase() }).select(
       "+password",
     );
-    console.log("USER FOUND:", !!user);
-    console.log("HAS PASSWORD:", !!user?.password);
-    console.log("PASSWORD HASH:", user?.password?.substring(0, 10));
 
+    
     if (!user || !user.password) {
       return NextResponse.json(
         { success: false, error: "Invalid credentials" },

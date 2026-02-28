@@ -1,75 +1,154 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/db";
-import { Message, Conversation } from "@/models/index";
+import Message from "@/models/Message";
+import Conversation from "@/models/Conversation";
+import User from "@/models/User";
 import { getAuthUser } from "@/lib/jwt";
 
-// GET /api/messages?conversationId=xxx — get messages
+// GET /api/messages?conversationId=xxx
 export async function GET(req) {
   try {
-    const decoded = await getAuthUser(req);
-    if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthUser(req);
+    if (!userId)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     await connectDB();
 
     const { searchParams } = new URL(req.url);
     const conversationId = searchParams.get("conversationId");
-    if (!conversationId) return NextResponse.json({ success: false, error: "conversationId required" }, { status: 400 });
+    if (!conversationId)
+      return NextResponse.json(
+        { success: false, error: "conversationId required" },
+        { status: 400 },
+      );
 
-    // Verify user is participant
     const conv = await Conversation.findById(conversationId);
-    if (!conv || !conv.participants.includes(decoded.userId)) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (!conv || !conv.participants.some((p) => p.toString() === userId)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
     }
 
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    const messages = await Message.find({ conversationId })
+    const messages = await Message.find({ conversation: conversationId })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
-      .populate("senderId", "displayName username avatar")
+      .populate("sender", "displayName username avatar")
       .lean();
 
     // Mark as read
-    await Message.updateMany({ conversationId, senderId: { $ne: decoded.userId }, read: false }, { read: true });
+    await Message.updateMany(
+      {
+        conversation: conversationId,
+        sender: { $ne: userId },
+        readBy: { $ne: userId },
+      },
+      { $addToSet: { readBy: userId } },
+    );
 
     return NextResponse.json({ success: true, data: messages.reverse() });
   } catch (err) {
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.error("[messages GET]", err);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 },
+    );
   }
 }
 
-// POST /api/messages — send message
+// POST /api/messages
 export async function POST(req) {
   try {
-    const decoded = await getAuthUser(req);
-    if (!decoded) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    const userId = await getAuthUser(req);
+    if (!userId)
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     await connectDB();
 
-    const { conversationId, text, attachments } = await req.json();
+    const { conversationId, text, image } = await req.json();
     if (!conversationId || !text?.trim()) {
-      return NextResponse.json({ success: false, error: "conversationId and text required" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "conversationId and text required" },
+        { status: 400 },
+      );
     }
 
     const conv = await Conversation.findById(conversationId);
-    if (!conv || !conv.participants.includes(decoded.userId)) {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    if (!conv || !conv.participants.some((p) => p.toString() === userId)) {
+      return NextResponse.json(
+        { success: false, error: "Forbidden" },
+        { status: 403 },
+      );
     }
 
     const message = await Message.create({
-      conversationId,
-      senderId: decoded.userId,
-      text: text.trim(),
-      attachments: attachments || [],
+      conversation: conversationId,
+      sender: userId,
+      content: text.trim(),
+      images: image ? [{ url: image }] : [],
+      readBy: [userId],
     });
 
     // Update conversation
-    conv.lastMessage = { text: text.trim(), senderId: decoded.userId, timestamp: new Date() };
+    conv.lastMessage = text.trim();
+    conv.lastMessageAt = new Date();
     await conv.save();
 
-    const populated = await Message.findById(message._id).populate("senderId", "displayName username avatar");
-    return NextResponse.json({ success: true, data: populated }, { status: 201 });
+    const populated = await Message.findById(message._id).populate(
+      "sender",
+      "displayName username avatar",
+    );
+
+    // Socket emit (fire and forget)
+    try {
+      const { emitToConversation, emitToUser } =
+        await import("@/lib/socketEmit");
+      const msgData = populated.toObject ? populated.toObject() : populated;
+      emitToConversation(conversationId, "newMessage", msgData);
+
+      conv.participants.forEach((p) => {
+        if (p.toString() !== userId) {
+          emitToUser(p.toString(), "conversation-updated", {
+            conversationId,
+            lastMessage: text.trim(),
+            lastMessageAt: new Date(),
+          });
+        }
+      });
+    } catch (e) {}
+
+    // Push notification (fire and forget)
+    try {
+      const { notifyUser } = await import("@/lib/pushNotify");
+      const senderName = populated.sender?.displayName || "Someone";
+      conv.participants.forEach((p) => {
+        if (p.toString() !== userId) {
+          notifyUser(p, {
+            title: senderName,
+            body: text.trim().slice(0, 100),
+            data: { type: "message", conversationId },
+          });
+        }
+      });
+    } catch (e) {}
+
+    return NextResponse.json(
+      { success: true, data: populated },
+      { status: 201 },
+    );
   } catch (err) {
-    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+    console.error("[messages POST]", err);
+    return NextResponse.json(
+      { success: false, error: "Server error" },
+      { status: 500 },
+    );
   }
 }

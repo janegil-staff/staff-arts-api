@@ -1,136 +1,119 @@
-// socket-server.js
-// Run SEPARATELY alongside Next.js: node socket-server.js
-// Next.js runs on :3000, Socket.IO runs on :3001
+// socket-server.js — runs alongside Next.js on port 4000
+import { createServer } from "http";
+import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 
-const { createServer } = require("http");
-const { Server } = require("socket.io");
-const mongoose = require("mongoose");
+const PORT = process.env.SOCKET_PORT || 4000;
+const JWT_SECRET = process.env.AUTH_SECRET || "change-me-in-production";
 
-const PORT = process.env.SOCKET_PORT || 3001;
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/staffarts";
-
-// ── CONNECT TO DB ──
-mongoose.connect(MONGO_URI).then(() => {
-  console.log("📦 MongoDB connected");
+const httpServer = createServer((req, res) => {
+  if (req.url === "/health") {
+    res.writeHead(200);
+    res.end("ok");
+    return;
+  }
+  // Internal emit endpoint for Next.js API routes
+  if (req.url === "/emit" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { room, event, data } = JSON.parse(body);
+        io.to(room).emit(event, data);
+        res.writeHead(200);
+        res.end("ok");
+      } catch (e) {
+        res.writeHead(400);
+        res.end("Bad request");
+      }
+    });
+    return;
+  }
+  res.writeHead(404);
+  res.end();
 });
 
-// Import models after connection
-const Message = require("./models/Message");
-const Conversation = require("./models/Conversation");
-
-// ── CREATE SERVER ──
-const httpServer = createServer();
 const io = new Server(httpServer, {
-  cors: {
-    origin: "*", // tighten in production
-    methods: ["GET", "POST"],
-  },
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// Track online users: userId → Set<socketId>
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error("No token"));
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    socket.userId = payload.userId || payload.id;
+    if (!socket.userId) return next(new Error("Invalid token"));
+    next();
+  } catch (err) {
+    next(new Error("Invalid token"));
+  }
+});
+
 const onlineUsers = new Map();
 
 io.on("connection", (socket) => {
-  console.log("🔌 Connected:", socket.id);
+  const userId = socket.userId;
+  console.log(`[Socket] Connected: ${userId} (${socket.id})`);
+  if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
+  onlineUsers.get(userId).add(socket.id);
+  socket.join(`user:${userId}`);
 
-  // ── JOIN ──
-  socket.on("join", (userId) => {
-    socket.userId = userId;
-    if (!onlineUsers.has(userId)) {
-      onlineUsers.set(userId, new Set());
-    }
-    onlineUsers.get(userId).add(socket.id);
-    socket.join(`user:${userId}`);
-    console.log(`✅ ${userId} online (${onlineUsers.get(userId).size} devices)`);
-  });
+  // Join/leave conversation rooms
+  socket.on("join-conversation", (id) => socket.join(`conv:${id}`));
+  socket.on("leave-conversation", (id) => socket.leave(`conv:${id}`));
 
-  // ── SEND MESSAGE ──
-  socket.on("sendMessage", async (data) => {
-    const { conversationId, senderId, receiverId, text, image, listingRef } = data;
-
-    try {
-      // Persist to DB
-      const message = await Message.create({
-        conversationId,
-        senderId,
-        receiverId,
-        text: text || "",
-        image: image || null,
-        listingRef: listingRef || undefined,
-      });
-
-      // Update conversation
-      await Conversation.findByIdAndUpdate(conversationId, {
-        lastMessage: {
-          text: text || (image ? "📷 Image" : ""),
-          senderId,
-          createdAt: message.createdAt,
-        },
-        updatedAt: new Date(),
-        $inc: { [`unreadCount.${receiverId}`]: 1 },
-      });
-
-      const payload = {
-        _id: message._id.toString(),
-        conversationId,
-        senderId,
-        receiverId,
-        text: message.text,
-        image: message.image,
-        listingRef: message.listingRef,
-        read: false,
-        createdAt: message.createdAt.toISOString(),
-      };
-
-      // Emit to both users
-      io.to(`user:${receiverId}`).emit("newMessage", payload);
-      io.to(`user:${senderId}`).emit("newMessage", payload);
-
-      console.log(`💬 ${senderId} → ${receiverId}: ${text || "📷"}`);
-    } catch (err) {
-      console.error("❌ sendMessage error:", err);
-      socket.emit("messageError", { error: "Failed to send message" });
-    }
-  });
-
-  // ── TYPING ──
-  socket.on("typing", ({ conversationId, userId, receiverId }) => {
-    io.to(`user:${receiverId}`).emit("userTyping", { conversationId, userId });
-  });
-
-  socket.on("stopTyping", ({ conversationId, userId, receiverId }) => {
-    io.to(`user:${receiverId}`).emit("userStopTyping", { conversationId, userId });
-  });
-
-  // ── MARK READ ──
-  socket.on("markRead", async ({ conversationId, userId, otherUserId }) => {
-    try {
-      await Message.updateMany(
-        { conversationId, receiverId: userId, read: false },
-        { read: true }
-      );
-      await Conversation.findByIdAndUpdate(conversationId, {
-        [`unreadCount.${userId}`]: 0,
-      });
-      io.to(`user:${otherUserId}`).emit("messagesRead", { conversationId, userId });
-    } catch (err) {
-      console.error("❌ markRead error:", err);
-    }
-  });
-
-  // ── DISCONNECT ──
-  socket.on("disconnect", () => {
-    if (socket.userId) {
-      const sockets = onlineUsers.get(socket.userId);
-      if (sockets) {
-        sockets.delete(socket.id);
-        if (sockets.size === 0) onlineUsers.delete(socket.userId);
+  // Send message — broadcast to conversation room
+  socket.on("sendMessage", (data) => {
+    const { conversationId, receiverId } = data;
+    if (conversationId) {
+      socket.to(`conv:${conversationId}`).emit("newMessage", data);
+      // Also emit to receiver's personal room in case they're not in the conv room
+      if (receiverId) {
+        socket.to(`user:${receiverId}`).emit("newMessage", data);
       }
     }
-    console.log("❌ Disconnected:", socket.id);
+  });
+
+  // Mark messages as read
+  socket.on("markRead", (data) => {
+    const { otherUserId, conversationId } = data;
+    if (otherUserId) {
+      io.to(`user:${otherUserId}`).emit("messagesRead", {
+        conversationId,
+        readBy: userId,
+      });
+    }
+  });
+
+  // Typing indicators (both formats for compatibility)
+  socket.on("typing", (data) => {
+    const convId = data.conversationId || data;
+    socket.to(`conv:${convId}`).emit("userTyping", { conversationId: convId, userId });
+    socket.to(`conv:${convId}`).emit("user-typing", { conversationId: convId, userId });
+  });
+  socket.on("stopTyping", (data) => {
+    const convId = data.conversationId || data;
+    socket.to(`conv:${convId}`).emit("userStopTyping", { conversationId: convId, userId });
+    socket.to(`conv:${convId}`).emit("user-stop-typing", { conversationId: convId, userId });
+  });
+  socket.on("stop-typing", (data) => {
+    const convId = data.conversationId || data;
+    socket.to(`conv:${convId}`).emit("userStopTyping", { conversationId: convId, userId });
+    socket.to(`conv:${convId}`).emit("user-stop-typing", { conversationId: convId, userId });
+  });
+
+  // Auto-join conversation rooms the user is part of
+  socket.on("joinMyConversations", (conversationIds) => {
+    if (Array.isArray(conversationIds)) {
+      conversationIds.forEach((id) => socket.join(`conv:${id}`));
+    }
+  });
+
+  socket.on("disconnect", () => {
+    const sockets = onlineUsers.get(userId);
+    if (sockets) { sockets.delete(socket.id); if (sockets.size === 0) onlineUsers.delete(userId); }
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Socket.IO server on http://localhost:${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`[Socket] Running on port ${PORT}`));

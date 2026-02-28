@@ -1,37 +1,14 @@
-// models/Conversation.js
 import mongoose from "mongoose";
 
 const conversationSchema = new mongoose.Schema(
   {
-    participants: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: true,
-      },
-    ],
-    lastMessage: {
-      text: String,
-      senderId: mongoose.Schema.Types.ObjectId,
-      createdAt: Date,
-    },
-    listingRef: {
-      listingId: { type: mongoose.Schema.Types.ObjectId, ref: "Artwork" },
-      title: String,
-      price: Number,
-      currency: String,
-      image: String,
-    },
-    unreadCount: {
-      type: Map,
-      of: Number,
-      default: {},
-    },
+    participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    lastMessage: { type: String, default: "" },
+    lastMessageAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
-
-conversationSchema.index({ participants: 1, updatedAt: -1 });
+conversationSchema.index({ participants: 1, lastMessageAt: -1 });
 
 export default mongoose.models.Conversation ||
   mongoose.model("Conversation", conversationSchema);
