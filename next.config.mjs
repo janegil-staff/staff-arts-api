@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    workerThreads: false,
-    cpus: 1,
-  },
+  /* config options here */
 };
 
 export default nextConfig;
