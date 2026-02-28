@@ -4,7 +4,6 @@ export const dynamic = "force-dynamic";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -74,18 +73,17 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login");
-    }
-  }, [status, router]);
-
-  if (status === "loading" || status === "unauthenticated") {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (!session) {
+    router.push("/login");
+    return null;
   }
 
   return (
@@ -99,10 +97,10 @@ export default function DashboardPage() {
       >
         <p className="section-label mb-3">Dashboard</p>
         <h1 className="font-heading text-4xl md:text-5xl mb-2">
-          Welcome back, {session?.user?.name?.split(" ")[0] || "Artist"}
+          Welcome back, {session.user.name?.split(" ")[0]}
         </h1>
         <p className="text-text-secondary">
-          {session?.user?.role === "artist"
+          {session.user.role === "artist"
             ? "Manage your portfolio and connect with collectors"
             : "Discover and collect extraordinary art"}
         </p>
