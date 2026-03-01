@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node dev.js",
+    "dev": "node server.js",
     "build": "next build",
-    "start": "node socket-server.js & next start"
+    "start": "NODE_ENV=production node server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -107,39 +107,6 @@ export async function POST(req) {
       "displayName username avatar",
     );
 
-    // Socket emit (fire and forget)
-    try {
-      const { emitToConversation, emitToUser } =
-        await import("@/lib/socketEmit");
-      const msgData = populated.toObject ? populated.toObject() : populated;
-      emitToConversation(conversationId, "newMessage", msgData);
-
-      conv.participants.forEach((p) => {
-        if (p.toString() !== userId) {
-          emitToUser(p.toString(), "conversation-updated", {
-            conversationId,
-            lastMessage: text.trim(),
-            lastMessageAt: new Date(),
-          });
-        }
-      });
-    } catch (e) {}
-
-    // Push notification (fire and forget)
-    try {
-      const { notifyUser } = await import("@/lib/pushNotify");
-      const senderName = populated.sender?.displayName || "Someone";
-      conv.participants.forEach((p) => {
-        if (p.toString() !== userId) {
-          notifyUser(p, {
-            title: senderName,
-            body: text.trim().slice(0, 100),
-            data: { type: "message", conversationId },
-          });
-        }
-      });
-    } catch (e) {}
-
     return NextResponse.json(
       { success: true, data: populated },
       { status: 201 },
