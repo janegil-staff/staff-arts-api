@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema } from "mongoose";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
 
@@ -8,11 +8,12 @@ export interface ITrack extends Document {
   artistName?: string;
   audioUrl: string;
   coverUrl?: string;
-  duration?: number;  // seconds
+  duration?: number; // seconds
   genre?: string;
   plays: number;
   createdAt: Date;
   updatedAt: Date;
+  date: Date;
 }
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -22,10 +23,11 @@ const trackSchema = new Schema<ITrack>(
     title: { type: String, required: true, trim: true, maxlength: 200 },
     artist: {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       index: true,
     },
+    date: { type: Date, required: true },
     artistName: { type: String, trim: true },
     audioUrl: { type: String, required: true },
     coverUrl: { type: String },
@@ -33,12 +35,12 @@ const trackSchema = new Schema<ITrack>(
     genre: { type: String, trim: true },
     plays: { type: Number, default: 0, min: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
-trackSchema.index({ title: 'text', artistName: 'text', genre: 'text' });
+trackSchema.index({ title: "text", artistName: "text", genre: "text" });
 trackSchema.index({ artist: 1, createdAt: -1 });
 
-export default mongoose.model<ITrack>('Track', trackSchema);
+export default mongoose.model<ITrack>("Track", trackSchema);
