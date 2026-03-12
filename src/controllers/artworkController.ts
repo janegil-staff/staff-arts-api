@@ -256,3 +256,41 @@ export const toggleSave = async (
     data: { saved: !alreadySaved, savesCount: updated!.savesCount },
   });
 };
+
+// ─── Saved artworks ───────────────────────────────────────────────────────────
+
+export const getSavedArtworks = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  const userId = req.user!.userId;
+  const { page = "1", limit = "20" } = req.query as PaginationQuery;
+
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(50, parseInt(limit));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [data, total] = await Promise.all([
+    Artwork.find({ saves: userId, status: { $in: ["published", "available"] } })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .populate("artist", "name displayName avatar slug"),
+    Artwork.countDocuments({ saves: userId }),
+  ]);
+
+  const enriched = data.map((a) => ({
+    ...a.toJSON(),
+    isLiked: a.likes.some((id) => id.toString() === userId),
+    isSaved: true,
+  }));
+
+  res.json({
+    success: true,
+    data: enriched,
+    total,
+    page: pageNum,
+    totalPages: Math.ceil(total / limitNum),
+    hasMore: skip + limitNum < total,
+  });
+};

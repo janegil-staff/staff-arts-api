@@ -9,6 +9,7 @@ import {
   deleteArtwork,
   toggleLike,
   toggleSave,
+  getSavedArtworks
 } from "../controllers/artworkController";
 import {
   getComments,
@@ -20,6 +21,7 @@ import { authenticate, optionalAuthenticate } from "../middleware/auth";
 
 const router = Router();
 
+router.get('/saved', authenticate, getSavedArtworks);
 router.get("/mediums", getArtworkMediums);
 router.get("/", optionalAuthenticate, getArtworks);
 router.get("/:id", optionalAuthenticate, getArtwork);
