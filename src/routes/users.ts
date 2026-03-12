@@ -7,13 +7,13 @@ import {
   toggleFollow,
   getUserArtworks,
 } from '../controllers/userController';
-import { authenticate } from '../middleware/auth';
+import { authenticate, optionalAuthenticate } from '../middleware/auth';
 
 const router = Router();
 
 router.get('/', getUsers);
-router.get('/username/:username', getUserByUsername);
-router.get('/:id', getUserById);
+router.get('/username/:username', optionalAuthenticate, getUserByUsername);
+router.get('/:id', optionalAuthenticate, getUserById);
 router.patch('/:id', authenticate, updateUser);
 router.post('/:id/follow', authenticate, toggleFollow);
 router.get('/:id/artworks', getUserArtworks);
