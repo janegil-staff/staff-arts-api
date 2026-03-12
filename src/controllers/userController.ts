@@ -80,7 +80,10 @@ export const updateUser = async (
   }
 
   // Prevent privilege escalation
-  delete req.body.role;
+  const allowedRoles = ["artist", "collector", "gallery"];
+  if (req.body.role && !allowedRoles.includes(req.body.role)) {
+    delete req.body.role;
+  }
   delete req.body.password;
   delete req.body.refreshToken;
 
@@ -135,7 +138,7 @@ export const getUserArtworks = async (
   const isOwner = myId === req.params.id;
 
   const filter: Record<string, unknown> = { artist: req.params.id };
-  if (!isOwner) filter.status = { $in: ['published', 'available'] };
+  if (!isOwner) filter.status = { $in: ["published", "available"] };
 
   const artworks = await Artwork.find(filter).sort({ createdAt: -1 });
   res.json({ success: true, data: artworks });
