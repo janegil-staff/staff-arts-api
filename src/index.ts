@@ -25,6 +25,10 @@ const start = async (): Promise<void> => {
   io.on("connection", (socket) => {
     console.log(`🔌 Socket connected: ${socket.id}`);
 
+    socket.on("join_user_room", (userId: string) => {
+      socket.join(`user_${userId}`);
+    });
+    
     // Client joins their conversation rooms
     socket.on("join_conversation", (conversationId: string) => {
       socket.join(conversationId);

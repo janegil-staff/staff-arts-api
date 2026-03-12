@@ -1,3 +1,4 @@
+// src/controllers/artworkController.ts
 import { Response } from "express";
 import Artwork from "../models/Artwork";
 import { AuthRequest, PaginationQuery } from "../types";
@@ -17,6 +18,7 @@ export const getArtworkMediums = async (
 };
 
 // ─── List ─────────────────────────────────────────────────────────────────────
+
 export const getArtworks = async (
   req: AuthRequest,
   res: Response,
@@ -30,6 +32,7 @@ export const getArtworks = async (
     artist,
     medium,
     search,
+    following,
   } = req.query as PaginationQuery & {
     status?: string;
     forSale?: string;
@@ -37,6 +40,7 @@ export const getArtworks = async (
     artist?: string;
     medium?: string;
     search?: string;
+    following?: string;
   };
 
   const filter: Record<string, unknown> = {};
@@ -49,18 +53,33 @@ export const getArtworks = async (
   if (forSale === "true") filter.forSale = true;
   if (category) filter.categories = category;
   if (artist) filter.artist = artist;
-  if (medium) filter.medium = new RegExp(`^${medium}$`, "i"); // case-insensitive match
+  if (medium) filter.medium = new RegExp(`^${medium}$`, "i");
+
+  if (following === "true" && req.user?.userId) {
+    const User = (await import("../models/User")).default;
+    const me = await User.findById(req.user.userId).select("following");
+    if (me && me.following.length > 0) {
+      filter.artist = { $in: me.following };
+    } else {
+      res.json({
+        success: true,
+        data: [],
+        total: 0,
+        page: 1,
+        totalPages: 0,
+        hasMore: false,
+      });
+      return;
+    }
+  }
 
   if (search) {
     const re = new RegExp(search, "i");
-
-    // Find matching artist IDs first
     const User = (await import("../models/User")).default;
     const matchingArtists = await User.find({
       $or: [{ name: re }, { displayName: re }],
     }).select("_id");
     const artistIds = matchingArtists.map((u) => u._id);
-
     filter.$or = [
       { title: re },
       { description: re },
@@ -82,9 +101,16 @@ export const getArtworks = async (
     Artwork.countDocuments(filter),
   ]);
 
+  const myId = req.user?.userId;
+  const enriched = data.map((a) => ({
+    ...a.toJSON(),
+    isLiked: myId ? a.likes.some((id) => id.toString() === myId) : false,
+    isSaved: myId ? a.saves.some((id) => id.toString() === myId) : false,
+  }));
+
   res.json({
     success: true,
-    data,
+    data: enriched,
     total,
     page: pageNum,
     totalPages: Math.ceil(total / limitNum),
@@ -107,7 +133,22 @@ export const getArtwork = async (
   // Increment views without waiting
   Artwork.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }).exec();
 
-  res.json({ success: true, data: artwork });
+  const myId = req.user?.userId;
+  const isLiked = myId
+    ? artwork.likes.some((id) => id.toString() === myId)
+    : false;
+  const isSaved = myId
+    ? artwork.saves.some((id) => id.toString() === myId)
+    : false;
+
+  res.json({
+    success: true,
+    data: {
+      ...artwork.toJSON(),
+      isLiked,
+      isSaved,
+    },
+  });
 };
 
 // ─── Create ───────────────────────────────────────────────────────────────────
@@ -137,7 +178,6 @@ export const updateArtwork = async (
   const isAdmin = req.user!.role === "admin";
   if (!isOwner && !isAdmin) throw new AppError("Not authorised", 403);
 
-  // Prevent overwriting artist field
   delete req.body.artist;
 
   const updated = await Artwork.findByIdAndUpdate(req.params.id, req.body, {

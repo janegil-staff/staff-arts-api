@@ -1,18 +1,25 @@
-import { Response } from 'express';
-import User from '../models/User';
-import Artwork from '../models/Artwork';
-import { AppError } from '../middleware/errorHandler';
-import { AuthRequest, PaginationQuery } from '../types';
+import { Response } from "express";
+import User from "../models/User";
+import Artwork from "../models/Artwork";
+import { AppError } from "../middleware/errorHandler";
+import { AuthRequest, PaginationQuery } from "../types";
 
 // ─── List users ───────────────────────────────────────────────────────────────
 
-export const getUsers = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { role, featured, page = '1', limit = '20' } = req.query as
-    PaginationQuery & { role?: string; featured?: string };
+export const getUsers = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  const {
+    role,
+    featured,
+    page = "1",
+    limit = "20",
+  } = req.query as PaginationQuery & { role?: string; featured?: string };
 
   const filter: Record<string, unknown> = {};
   if (role) filter.role = role;
-  if (featured === 'true') filter.isFeatured = true;
+  if (featured === "true") filter.isFeatured = true;
 
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(50, parseInt(limit));
@@ -35,27 +42,41 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
 
 // ─── Get by username/slug ─────────────────────────────────────────────────────
 
-export const getUserByUsername = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserByUsername = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   const user = await User.findOne({
     $or: [{ username: req.params.username }, { slug: req.params.username }],
   });
-  if (!user) throw new AppError('User not found', 404);
-  res.json({ success: true, data: user });
+  if (!user) throw new AppError("User not found", 404);
+  const myId = req.user?.userId;
+  const isFollowing = myId
+    ? user.followers.some((id) => id.toString() === myId)
+    : false;
+  res.json({ success: true, data: { ...user.toJSON(), isFollowing } });
 };
 
-// ─── Get by ID ────────────────────────────────────────────────────────────────
-
-export const getUserById = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserById = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   const user = await User.findById(req.params.id);
-  if (!user) throw new AppError('User not found', 404);
-  res.json({ success: true, data: user });
+  if (!user) throw new AppError("User not found", 404);
+  const myId = req.user?.userId;
+  const isFollowing = myId
+    ? user.followers.some((id) => id.toString() === myId)
+    : false;
+  res.json({ success: true, data: { ...user.toJSON(), isFollowing } });
 };
-
 // ─── Update profile ───────────────────────────────────────────────────────────
 
-export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
-  if (req.params.id !== req.user!.userId && req.user!.role !== 'admin') {
-    throw new AppError('Not authorised', 403);
+export const updateUser = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  if (req.params.id !== req.user!.userId && req.user!.role !== "admin") {
+    throw new AppError("Not authorised", 403);
   }
 
   // Prevent privilege escalation
@@ -67,21 +88,23 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     new: true,
     runValidators: true,
   });
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
 
   res.json({ success: true, data: user });
 };
 
 // ─── Follow / Unfollow ────────────────────────────────────────────────────────
 
-export const toggleFollow = async (req: AuthRequest, res: Response): Promise<void> => {
-  const targetId = req.params.id;
+export const toggleFollow = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   const myId = req.user!.userId;
-
-  if (targetId === myId) throw new AppError('Cannot follow yourself', 400);
+  const targetId = req.params.id;
+  if (targetId === myId) throw new AppError("Cannot follow yourself", 400);
 
   const target = await User.findById(targetId);
-  if (!target) throw new AppError('User not found', 404);
+  if (!target) throw new AppError("User not found", 404);
 
   const isFollowing = target.followers.some((id) => id.toString() === myId);
 
@@ -93,15 +116,24 @@ export const toggleFollow = async (req: AuthRequest, res: Response): Promise<voi
     await User.findByIdAndUpdate(myId, { $addToSet: { following: targetId } });
   }
 
+  // Emit live update to target user's room
+  const io = req.app.get("io");
+  io?.to(`user_${targetId}`).emit("follow_update", {
+    following: !isFollowing,
+    followerCount: target.followers.length + (isFollowing ? -1 : 1),
+  });
+
   res.json({ success: true, data: { following: !isFollowing } });
 };
-
 // ─── Get user's artworks ──────────────────────────────────────────────────────
 
-export const getUserArtworks = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getUserArtworks = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
   const artworks = await Artwork.find({
     artist: req.params.id,
-    status: 'published',
+    status: "published",
   }).sort({ createdAt: -1 });
 
   res.json({ success: true, data: artworks });
