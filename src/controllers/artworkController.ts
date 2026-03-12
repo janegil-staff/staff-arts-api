@@ -3,8 +3,20 @@ import Artwork from "../models/Artwork";
 import { AuthRequest, PaginationQuery } from "../types";
 import { AppError } from "../middleware/errorHandler";
 
-// ─── List ─────────────────────────────────────────────────────────────────────
+// ─── Mediums ──────────────────────────────────────────────────────────────────
 
+export const getArtworkMediums = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  const mediums = await Artwork.distinct("medium", {
+    medium: { $ne: "" },
+    status: { $in: ["published", "available"] },
+  });
+  res.json({ success: true, data: mediums.sort() });
+};
+
+// ─── List ─────────────────────────────────────────────────────────────────────
 export const getArtworks = async (
   req: AuthRequest,
   res: Response,
@@ -16,14 +28,19 @@ export const getArtworks = async (
     forSale,
     category,
     artist,
+    medium,
+    search,
   } = req.query as PaginationQuery & {
     status?: string;
     forSale?: string;
     category?: string;
     artist?: string;
+    medium?: string;
+    search?: string;
   };
 
   const filter: Record<string, unknown> = {};
+
   if (status && status !== "all") {
     filter.status = status;
   } else {
@@ -32,6 +49,25 @@ export const getArtworks = async (
   if (forSale === "true") filter.forSale = true;
   if (category) filter.categories = category;
   if (artist) filter.artist = artist;
+  if (medium) filter.medium = new RegExp(`^${medium}$`, "i"); // case-insensitive match
+
+  if (search) {
+    const re = new RegExp(search, "i");
+
+    // Find matching artist IDs first
+    const User = (await import("../models/User")).default;
+    const matchingArtists = await User.find({
+      $or: [{ name: re }, { displayName: re }],
+    }).select("_id");
+    const artistIds = matchingArtists.map((u) => u._id);
+
+    filter.$or = [
+      { title: re },
+      { description: re },
+      { tags: re },
+      ...(artistIds.length ? [{ artist: { $in: artistIds } }] : []),
+    ];
+  }
 
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(50, parseInt(limit));

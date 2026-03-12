@@ -30,7 +30,8 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(
   rateLimit({
     windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    max: Number(process.env.RATE_LIMIT_MAX) || 100,
+    max: Number(process.env.RATE_LIMIT_MAX) || 2000,
+    skip: (req) => req.path.includes("/auth/refresh") || req.path.includes("/socket.io"),
     message: { success: false, error: 'Too many requests, please try again later' },
   })
 );
