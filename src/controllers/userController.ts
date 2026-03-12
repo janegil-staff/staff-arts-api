@@ -131,10 +131,12 @@ export const getUserArtworks = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
-  const artworks = await Artwork.find({
-    artist: req.params.id,
-    status: "published",
-  }).sort({ createdAt: -1 });
+  const myId = req.user?.userId;
+  const isOwner = myId === req.params.id;
 
+  const filter: Record<string, unknown> = { artist: req.params.id };
+  if (!isOwner) filter.status = { $in: ['published', 'available'] };
+
+  const artworks = await Artwork.find(filter).sort({ createdAt: -1 });
   res.json({ success: true, data: artworks });
 };

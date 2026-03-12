@@ -3,7 +3,7 @@ import { Response } from "express";
 import Artwork from "../models/Artwork";
 import { AuthRequest, PaginationQuery } from "../types";
 import { AppError } from "../middleware/errorHandler";
-
+import cloudinary from "../config/cloudinary";
 // ─── Mediums ──────────────────────────────────────────────────────────────────
 
 export const getArtworkMediums = async (
@@ -201,10 +201,15 @@ export const deleteArtwork = async (
   const isAdmin = req.user!.role === "admin";
   if (!isOwner && !isAdmin) throw new AppError("Not authorised", 403);
 
+  // Delete images from Cloudinary
+  const deletePromises = artwork.images
+    .filter((img) => img.publicId)
+    .map((img) => cloudinary.uploader.destroy(img.publicId!).catch(() => {}));
+  await Promise.all(deletePromises);
+
   await artwork.deleteOne();
   res.json({ success: true, message: "Artwork deleted" });
 };
-
 // ─── Like ─────────────────────────────────────────────────────────────────────
 
 export const toggleLike = async (
