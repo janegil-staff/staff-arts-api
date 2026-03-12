@@ -3,7 +3,10 @@ import User from "../models/User";
 import Artwork from "../models/Artwork";
 import { AppError } from "../middleware/errorHandler";
 import { AuthRequest, PaginationQuery } from "../types";
-
+import Exhibition from "../models/Exhibition";
+import Track from "../models/Track";
+import Event from "../models/Event";
+import cloudinary from "../config/cloudinary";
 // ─── List users ───────────────────────────────────────────────────────────────
 
 export const getUsers = async (
@@ -148,9 +151,46 @@ export const deleteUser = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
-  if (req.params.id !== req.user!.userId && req.user!.role !== "admin") {
-    throw new AppError("Not authorised", 403);
+  if (req.params.id !== req.user!.userId && req.user!.role !== 'admin') {
+    throw new AppError('Not authorised', 403);
   }
-  await User.findByIdAndDelete(req.params.id);
-  res.json({ success: true, message: "Account deleted" });
+
+  const userId = req.params.id;
+
+  // Delete Cloudinary images for artworks
+  const artworks = await Artwork.find({ artist: userId });
+  const artworkImageDeletes = artworks.flatMap((a) =>
+    a.images
+      .filter((img) => img.publicId)
+      .map((img) => cloudinary.uploader.destroy(img.publicId).catch(() => {}))
+  );
+
+  // Delete Cloudinary images for events
+  const events = await Event.find({ createdBy: userId });
+  const eventImageDeletes = events
+    .filter((e) => e.coverImage?.publicId)
+    .map((e) => cloudinary.uploader.destroy(e.coverImage!.publicId!).catch(() => {}));
+
+  // Delete Cloudinary images for exhibitions
+  const exhibitions = await Exhibition.find({ createdBy: userId });
+  const exhibitionImageDeletes = exhibitions
+    .filter((e) => e.coverImage?.publicId)
+    .map((e) => cloudinary.uploader.destroy(e.coverImage!.publicId!).catch(() => {}));
+
+  await Promise.all([
+    ...artworkImageDeletes,
+    ...eventImageDeletes,
+    ...exhibitionImageDeletes,
+  ]);
+
+  // Delete all associated content
+  await Promise.all([
+    Artwork.deleteMany({ artist: userId }),
+    Event.deleteMany({ createdBy: userId }),
+    Exhibition.deleteMany({ createdBy: userId }),
+    Track.deleteMany({ artist: userId }),
+  ]);
+
+  await User.findByIdAndDelete(userId);
+  res.json({ success: true, message: 'Account deleted' });
 };
