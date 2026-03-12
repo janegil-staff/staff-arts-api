@@ -143,3 +143,14 @@ export const getUserArtworks = async (
   const artworks = await Artwork.find(filter).sort({ createdAt: -1 });
   res.json({ success: true, data: artworks });
 };
+
+export const deleteUser = async (
+  req: AuthRequest,
+  res: Response,
+): Promise<void> => {
+  if (req.params.id !== req.user!.userId && req.user!.role !== "admin") {
+    throw new AppError("Not authorised", 403);
+  }
+  await User.findByIdAndDelete(req.params.id);
+  res.json({ success: true, message: "Account deleted" });
+};
