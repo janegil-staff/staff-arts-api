@@ -1,5 +1,6 @@
 // src/controllers/conversationController.ts
 import { Response } from "express";
+import mongoose from "mongoose";
 import { Message, Conversation } from "../models/Conversation";
 import { AppError } from "../middleware/errorHandler";
 import { AuthRequest } from "../types";
