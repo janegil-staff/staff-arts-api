@@ -56,6 +56,10 @@ app.get('/reset-password', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/reset-password.html'));
 });
 
+app.get('/support', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/support.html'));
+});
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 app.use('/api/mobile/auth', authRouter);
