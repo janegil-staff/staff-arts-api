@@ -60,6 +60,9 @@ app.get('/support', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/support.html'));
 });
 
+app.get('/privacy', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/privacy.html'));
+});
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 app.use('/api/mobile/auth', authRouter);
