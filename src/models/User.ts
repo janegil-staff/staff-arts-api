@@ -33,6 +33,8 @@ export interface IUser extends Document {
   followingCount: number; // virtual
   createdAt: Date;
   updatedAt: Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 
   // Methods
   comparePassword(candidate: string): Promise<boolean>;
@@ -71,6 +73,8 @@ const userSchema = new Schema<IUser, IUserModel>(
       sparse: true,
       unique: true,
     },
+    passwordResetToken: { type: String },
+    passwordResetExpires: { type: Date },
     role: {
       type: String,
       enum: ["artist", "collector", "curator", "gallery", "admin"],
