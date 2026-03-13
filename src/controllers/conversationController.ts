@@ -49,7 +49,9 @@ export const getOrCreateConversation = async (
     participants: [req.user!.userId, participantId],
   });
 
-  const populated = await Conversation.findById(conversation._id)
+  const populated = await Conversation.findById(
+    (conversation._id as mongoose.Types.ObjectId).toString(),
+  )
     .populate("participants", "name displayName avatar slug")
     .populate("lastMessage");
 
@@ -62,7 +64,7 @@ export const getMessages = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
-  const convo = await Conversation.findById(req.params.id);
+  const convo = await Conversation.findById(req.params.id as string);
   if (!convo) throw new AppError("Conversation not found", 404);
 
   const isParticipant = convo.participants.some(
@@ -70,20 +72,22 @@ export const getMessages = async (
   );
   if (!isParticipant) throw new AppError("Not a participant", 403);
 
-  const messages = await Message.find({ conversation: req.params.id })
+  const messages = await Message.find({ conversation: req.params.id as string })
     .sort({ createdAt: 1 })
     .populate("sender", "name displayName avatar slug");
 
-  // Mark all unread as read
   await Message.updateMany(
-    { conversation: req.params.id, readBy: { $ne: req.user!.userId } },
+    {
+      conversation: req.params.id as string,
+      readBy: { $ne: req.user!.userId },
+    },
     { $addToSet: { readBy: req.user!.userId } },
   );
 
   res.json({ success: true, data: messages });
 };
 
-// ─── Get unread counts ───────────────────────────────────────────────────────
+// ─── Get unread counts ────────────────────────────────────────────────────────
 
 export const getUnreadCounts = async (
   req: AuthRequest,
@@ -124,7 +128,7 @@ export const sendMessage = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
-  const convo = await Conversation.findById(req.params.id);
+  const convo = await Conversation.findById(req.params.id as string);
   if (!convo) throw new AppError("Conversation not found", 404);
 
   const isParticipant = convo.participants.some(
@@ -133,24 +137,22 @@ export const sendMessage = async (
   if (!isParticipant) throw new AppError("Not a participant", 403);
 
   const message = await Message.create({
-    conversation: req.params.id,
+    conversation: req.params.id as string,
     sender: req.user!.userId,
     text: req.body.text,
     readBy: [req.user!.userId],
   });
 
-  await Conversation.findByIdAndUpdate(req.params.id, {
+  await Conversation.findByIdAndUpdate(req.params.id as string, {
     lastMessage: message._id,
     lastMessageAt: new Date(),
   });
 
-  // Populate sender before emitting
   const populated = await Message.findById(message._id).populate(
     "sender",
     "name displayName avatar slug",
   );
 
-  // Emit to all sockets in the conversation room
   const io = req.app.get("io");
   if (io) {
     io.to(req.params.id).emit("new_message", populated);

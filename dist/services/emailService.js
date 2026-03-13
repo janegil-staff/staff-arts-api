@@ -1,22 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sendVerificationEmail = void 0;
 // src/services/emailService.ts
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-const FROM = process.env.EMAIL_FROM ?? "STAFF Arts <noreply@staffarts.com>";
-const BASE_URL = process.env.APP_URL ?? "https://staffarts.com";
-
-export const sendVerificationEmail = async (
-  email: string,
-  name: string,
-  token: string,
-): Promise<void> => {
-  const link = `${BASE_URL}/api/auth/verify-email/${token}`;
-
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: "Verify your STAFF Arts account",
-    html: `
+const resend_1 = require("resend");
+const resend = new resend_1.Resend(process.env.RESEND_API_KEY);
+const FROM = process.env.EMAIL_FROM ?? 'STAFF Arts <noreply@staffarts.com>';
+const BASE_URL = process.env.APP_URL ?? 'https://staffarts.com';
+const sendVerificationEmail = async (email, name, token) => {
+    const link = `${BASE_URL}/api/auth/verify-email/${token}`;
+    await resend.emails.send({
+        from: FROM,
+        to: email,
+        subject: 'Verify your STAFF Arts account',
+        html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0f0f0f; color: #f5f5f5; border-radius: 12px;">
         <h1 style="font-size: 24px; font-weight: 300; margin-bottom: 8px;">
           Welcome to <span style="color: #2dd4a7; font-style: italic;">STAFF Arts</span>
@@ -32,5 +28,7 @@ export const sendVerificationEmail = async (
         </p>
       </div>
     `,
-  });
+    });
 };
+exports.sendVerificationEmail = sendVerificationEmail;
+//# sourceMappingURL=emailService.js.map

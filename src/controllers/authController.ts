@@ -1,3 +1,4 @@
+// src/controllers/authController.ts
 import { Response } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
@@ -33,7 +34,7 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
 
   const user = await User.create({ email, password, name, role });
 
-  const payload: JwtPayload = { userId: user.id, role: user.role };
+  const payload: JwtPayload = { userId: user._id.toString(), role: user.role };
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 
@@ -57,12 +58,13 @@ export const login = async (req: AuthRequest, res: Response): Promise<void> => {
     throw new AppError('Invalid email or password', 401);
   }
 
-  const payload: JwtPayload = { userId: user.id, role: user.role };
+  const payload: JwtPayload = { userId: user._id.toString(), role: user.role };
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 
   user.refreshToken = refreshToken;
   await user.save({ validateBeforeSave: false });
+
   res.json({
     success: true,
     data: { user, accessToken, refreshToken },
@@ -87,7 +89,7 @@ export const refresh = async (req: AuthRequest, res: Response): Promise<void> =>
     throw new AppError('Refresh token mismatch', 401);
   }
 
-  const payload: JwtPayload = { userId: user.id, role: user.role };
+  const payload: JwtPayload = { userId: user._id.toString(), role: user.role };
   const newAccessToken = signAccessToken(payload);
   const newRefreshToken = signRefreshToken(payload);
 

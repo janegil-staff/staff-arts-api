@@ -1,10 +1,12 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
-import bcrypt from 'bcryptjs';
-import { UserRole } from '../types';
+// src/models/User.ts
+import mongoose, { Document, Schema, Model } from "mongoose";
+import bcrypt from "bcryptjs";
+import { UserRole } from "../types";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
 
 export interface IUser extends Document {
+  _id: mongoose.Types.ObjectId;
   email: string;
   password: string;
   name?: string;
@@ -27,8 +29,8 @@ export interface IUser extends Document {
   following: mongoose.Types.ObjectId[];
   savedArtworks: mongoose.Types.ObjectId[];
   refreshToken?: string;
-  followerCount: number;   // virtual
-  followingCount: number;  // virtual
+  followerCount: number; // virtual
+  followingCount: number; // virtual
   createdAt: Date;
   updatedAt: Date;
 
@@ -55,56 +57,66 @@ const userSchema = new Schema<IUser, IUserModel>(
     password: { type: String, required: true, minlength: 6, select: false },
     name: { type: String, trim: true },
     displayName: { type: String, trim: true },
-    username: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
-    slug: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
+    username: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      sparse: true,
+      unique: true,
+    },
+    slug: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      sparse: true,
+      unique: true,
+    },
     role: {
       type: String,
-      enum: ['artist', 'collector', 'curator', 'gallery', 'admin'],
-      default: 'collector',
+      enum: ["artist", "collector", "curator", "gallery", "admin"],
+      default: "collector",
     },
     avatar: { type: String },
     coverImage: { type: String },
     bio: { type: String, maxlength: 500 },
     location: { type: String },
-    website: { type: String, default: '' },
+    website: { type: String, default: "" },
     verified: { type: Boolean, default: false },
     socialLinks: { type: Map, of: String, default: {} },
     mediums: [{ type: String }],
     styles: [{ type: String }],
     isAvailableForCommission: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
-    followers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    following: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    savedArtworks: [{ type: Schema.Types.ObjectId, ref: 'Artwork' }],
+    followers: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    following: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    savedArtworks: [{ type: Schema.Types.ObjectId, ref: "Artwork" }],
     refreshToken: { type: String, select: false },
   },
   {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 // ─── Virtuals ─────────────────────────────────────────────────────────────────
 
-userSchema.virtual('followerCount').get(function (this: IUser) {
+userSchema.virtual("followerCount").get(function (this: IUser) {
   return this.followers?.length ?? 0;
 });
 
-userSchema.virtual('followingCount').get(function (this: IUser) {
+userSchema.virtual("followingCount").get(function (this: IUser) {
   return this.following?.length ?? 0;
 });
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-userSchema.pre('save', async function () {
-  // Auto-generate slug from username if not set
-  if (this.isModified('username') && this.username && !this.slug) {
+userSchema.pre("save", async function () {
+  if (this.isModified("username") && this.username && !this.slug) {
     this.slug = this.username;
   }
 
-  // Hash password only when changed
-  if (this.isModified('password')) {
+  if (this.isModified("password")) {
     this.password = await bcrypt.hash(this.password, 12);
   }
 });
@@ -113,12 +125,11 @@ userSchema.pre('save', async function () {
 
 userSchema.methods.comparePassword = async function (
   this: IUser,
-  candidate: string
+  candidate: string,
 ): Promise<boolean> {
   return bcrypt.compare(candidate, this.password);
 };
 
-// Remove sensitive fields when serialising to JSON
 userSchema.methods.toJSON = function (this: IUser) {
   const obj = this.toObject();
   delete obj.password;
@@ -131,13 +142,13 @@ userSchema.methods.toJSON = function (this: IUser) {
 
 // ─── Statics ──────────────────────────────────────────────────────────────────
 
-userSchema.static('findByEmail', function (email: string) {
-  return this.findOne({ email }).select('+password +refreshToken');
+userSchema.static("findByEmail", function (email: string) {
+  return this.findOne({ email }).select("+password +refreshToken");
 });
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
 userSchema.index({ role: 1, isFeatured: 1 });
-userSchema.index({ name: 'text', displayName: 'text', bio: 'text' });
+userSchema.index({ name: "text", displayName: "text", bio: "text" });
 
-export default mongoose.model<IUser, IUserModel>('User', userSchema);
+export default mongoose.model<IUser, IUserModel>("User", userSchema);
