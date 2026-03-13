@@ -13,16 +13,24 @@ export const getUsers = async (
   req: AuthRequest,
   res: Response,
 ): Promise<void> => {
-  const {
-    role,
-    featured,
-    page = "1",
-    limit = "20",
-  } = req.query as PaginationQuery & { role?: string; featured?: string };
+const {
+  role,
+  featured,
+  search,        // ← legg til
+  page = "1",
+  limit = "20",
+} = req.query as PaginationQuery & { role?: string; featured?: string; search?: string };
 
-  const filter: Record<string, unknown> = {};
-  if (role) filter.role = role;
-  if (featured === "true") filter.isFeatured = true;
+const filter: Record<string, unknown> = {};
+if (role) filter.role = role;
+if (featured === "true") filter.isFeatured = true;
+if (search) {                                        // ← legg til
+  filter.$or = [
+    { name: { $regex: search, $options: 'i' } },
+    { displayName: { $regex: search, $options: 'i' } },
+    { username: { $regex: search, $options: 'i' } },
+  ];
+}
 
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(50, parseInt(limit));
